@@ -1,4 +1,15 @@
 #!/bin/bash
+
+GH="https://github.com"
+GH_USER="rickeymandraque"
+GH_REPO="xui.one-24.04"
+GH_URL_REPO="$GH/$GH_USER/$GH_REPO"
+GH_RAW="$GH_URL_REPO/raw/refs/heads/master"
+LATEST_VERSION=$(curl -sL "$GH_RAW/latest.ver")
+OFFICIAL_RELEASE="https://update.xui.one/$LATEST_VERSION"
+GH_RELEASE="$GH8RAW/latest.ver"
+
+
 echo -e "\nChecking that minimal requirements are ok"
 
 # Ensure the OS is compatible with the launcher
