@@ -7,8 +7,31 @@ GH_URL_REPO="$GH/$GH_USER/$GH_REPO"
 GH_RAW="$GH_URL_REPO/raw/refs/heads/master"
 LATEST_VERSION=$(curl -sL "$GH_RAW/latest.ver")
 OFFICIAL_RELEASE="https://update.xui.one/$LATEST_VERSION"
-GH_RELEASE="$GH8RAW/latest.ver"
+GH_RELEASE="$GH_RAW/latest.ver"
 
+# Function to check if the script is run as root
+check_root() {
+    if [[ $EUID -ne 0 ]]; then
+        echo "I am Groot !"
+        echo "[ERROR] This script must be run as root or with sudo."
+        # Attempt to relaunch with sudo if possible
+        if command -v sudo &> /dev/null; then
+            echo "[INFO] Attempting to relaunch with sudo..."
+            echo "I am Root !"
+            sudo bash -c "$*"
+            exit $? # Exit with the status of the sudo command
+        else
+            echo "[ERROR] 'sudo' is not available. Please run this script as root."
+            exit 1
+        fi
+    fi
+}
+
+# Initial user-mode message
+if [[ $EUID -ne 0 ]]; then
+    echo "I am Groot!"
+    echo "It seems you have launched the script as a regular user."
+fi
 
 echo -e "\nChecking that minimal requirements are ok"
 
@@ -18,9 +41,9 @@ if [ -f /etc/centos-release ]; then
        rpm -q "$1" &> /dev/null
     } 
     if (inst "centos-stream-repos"); then
-    OS="CentOS-Stream"
+        OS="CentOS-Stream"
     else
-    OS="CentOs"
+        OS="CentOs"
     fi    
     VERFULL="$(sed 's/^.*release //;s/ (Fin.*$//' /etc/centos-release)"
     VER="${VERFULL:0:1}" # return 6, 7 or 8
@@ -37,16 +60,25 @@ elif [ -f /etc/lsb-release ]; then
 elif [ -f /etc/os-release ]; then
     OS="$(grep -w ID /etc/os-release | sed 's/^.*=//')"
     VER="$(grep -w VERSION_ID /etc/os-release | sed 's/^.*=//')"
- else
+else
     OS="$(uname -s)"
     VER="$(uname -r)"
 fi
 ARCH=$(uname -m)
 echo "Detected : $OS  $VER  $ARCH"
-wget https://github.com/amidevous/xui.one/raw/refs/heads/master/install-dep.sh -qO /tmp/install-dep.sh >/dev/null 2>&1
-bash /tmp/install-dep.sh
-cd /root
-wget https://github.com/amidevous/xui.one/releases/download/test/XUI_1.5.13.zip -qO XUI_1.5.13.zip >/dev/null 2>&1
-unzip XUI_1.5.13.zip >/dev/null 2>&1
-wget https://raw.githubusercontent.com/amidevous/xui.one/master/install.python3 -qO /root/install.python3 >/dev/null 2>&1
-python3 /root/install.python3
+
+# Download and unzip files as a regular user
+tmp_dir=$(mktemp -d)
+trap "rm -rf $tmp_dir" EXIT
+
+wget "$GH_RAW/install-dep.sh" -qO "$tmp_dir/install-dep.sh" >/dev/null 2>&1
+wget "$GH_RELEASE" -qO "$tmp_dir/$LATEST_VERSION" >/dev/null 2>&1
+unzip "$tmp_dir/$LATEST_VERSION" -d "$tmp_dir" >/dev/null 2>&1
+wget "$GH_RAW/install.python3" -qO "$tmp_dir/install.python3" >/dev/null 2>&1
+
+chmod +x "$tmp_dir/install-dep.sh"
+chmod +x "$tmp_dir/install.python3"
+
+# Execute the scripts as root
+check_root "$tmp_dir/install-dep.sh"
+check_root "python3 $tmp_dir/install.python3"
